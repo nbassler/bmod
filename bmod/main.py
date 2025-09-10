@@ -4,6 +4,8 @@ import logging
 
 import bmod.config_parser
 
+from bmod.xrv_runner import run
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,9 +28,15 @@ def main(args=None) -> int:
 
     input_path = parsed_args.input
 
+    # load configuration
+    config = bmod.config_parser.load_config(parsed_args.config)
+    logger.debug(f"Loaded config: {config}")
+
     if not input_path:
         logger.error("No input file or directory specified.")
         return 1
+
+    run(input_path, config)
 
     return 0
 
