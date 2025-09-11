@@ -1,64 +1,100 @@
 from __future__ import annotations
+
+import logging
 import numpy as np
+
 from scipy.ndimage import median_filter, label, center_of_mass
+
+
+logger = logging.getLogger(__name__)
 
 
 def initial_guess_single_spot(
     img: np.ndarray,
     *,
     median_size: int = 3,
-    snr: float = 5.0,
-    window_radius: int = 10,
+    window_radius: int = 20,
 ):
+    """ Initial guess for a single bright spot in the image.
+    Parameters
+    ----------
+    img : np.ndarray
+        2D image array.
+    median_size : int
+        Size of the median filter window.
+    window_radius : int
+        Radius of the local window for size estimation. Should be larger than expected spot size.
+    Returns
+    -------
+    dict
+        Dictionary with initial guess parameters.
     """
-    Fast, robust initial guess for one main spot:
-    1) median-filter to kill hot pixels
-    2) robust background/noise (median + MAD)
-    3) threshold -> largest blob -> centroid
-    4) rough size from windowed second moments
-    """
-    work = img.astype(np.float32, copy=False)
+    # 0. Preprocess: median filter to reduce noise
+    work = img.astype(np.float32, copy=True)
     if median_size and median_size > 1:
         work = median_filter(work, size=median_size)
 
-    # robust background + noise
-    med = np.median(work)
-    mad = np.median(np.abs(work - med)) + 1e-12
-    sigma = 1.4826 * mad
+    # 1. Use half of the max value as the threshold
+    thr = 0.5 * work.max()
 
-    thr = med + snr * max(sigma, 1e-6)
+    # 2. Create mask and select largest blob
     mask = work >= thr
-
-    # pick largest blob (or fallback to global max)
     labels, n = label(mask)
+
     if n == 0:
         y0, x0 = np.unravel_index(np.argmax(work), work.shape)
+        print("Warning: No spot found above threshold; using global max.", y0, x0)
     else:
         areas = [(labels == k).sum() for k in range(1, n + 1)]
         kmax = 1 + int(np.argmax(areas))
         cy, cx = center_of_mass(mask, labels=labels, index=kmax)
         y0, x0 = int(round(cy)), int(round(cx))
+        print(f"Found {n} spots; using largest at ({y0}, {x0}) with area {areas[kmax-1]}.")
 
-    # amplitude / offset
-    amp = float(work[y0, x0] - med)
+    # 3. Background: median of non-spot pixels
+    bg_mask = work < thr
+    med = np.median(work[bg_mask])
     offset = float(med)
 
-    # crude size from local window moments
-    y, x = np.mgrid[0:work.shape[0], 0:work.shape[1]]
+    # 4. Amplitude and size
+    amp = float(work[y0, x0] - med)
+
+    # 5. Local window for size estimation
     y0a = max(0, y0 - window_radius)
     y1a = min(work.shape[0], y0 + window_radius + 1)
     x0a = max(0, x0 - window_radius)
     x1a = min(work.shape[1], x0 + window_radius + 1)
+
+    # Extract the patch and its local coordinates
     patch = work[y0a:y1a, x0a:x1a] - med
     patch[patch < 0] = 0
+
     if patch.sum() > 0:
-        yy, xx = np.mgrid[y0a:y1a, x0a:x1a]
-        wy = (patch * (yy - y0) ** 2).sum() / patch.sum()
-        wx = (patch * (xx - x0) ** 2).sum() / patch.sum()
+        # Create local coordinates centered on (0, 0) for the patch
+        yy_local, xx_local = np.mgrid[-(y0 - y0a):(y1a - y0), -(x0 - x0a):(x1a - x0)]
+        wy = (patch * (yy_local) ** 2).sum() / patch.sum()
+        wx = (patch * (xx_local) ** 2).sum() / patch.sum()
         sigma_y = float(np.sqrt(max(wy, 1e-12)))
         sigma_x = float(np.sqrt(max(wx, 1e-12)))
     else:
-        sigma_x = sigma_y = 3.0  # conservative default
+        sigma_x = sigma_y = 15.0  # Default for ~30-pixel FWHM
+
+    # for debugging:
+    # import matplotlib.pyplot as plt
+    # logger.debug("Median:", med)
+    # logger.debug("Threshold:", thr)
+    # logger.debug("Max value:", work.max())
+    # # After running initial_guess_single_spot:
+    # fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    # axes[0].imshow(work, cmap="gray")
+    # axes[0].axvline(x0, color="red", linestyle="--")
+    # axes[0].axhline(y0, color="red", linestyle="--")
+    # axes[0].set_title("Filtered image with centroid")
+    # axes[1].imshow(mask, cmap="gray")
+    # axes[1].set_title("Thresholded mask")
+    # axes[2].imshow(patch, cmap="gray")
+    # axes[2].set_title("Local patch for size estimation")
+    # plt.show()
 
     return {
         "amp": max(amp, 1e-6),

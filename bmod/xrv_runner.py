@@ -55,12 +55,12 @@ def run(input_dir: Path,
 
     i = 0
     # just a check for what files are opened:
-    for zdir, tiffs in groups.items():
-        z = zpos[i] if i < len(zpos) else None
-        i += 1
-        logger.info("Z dir: %s with %d files", zdir.name, len(tiffs))
-        for t in tiffs:
-            logger.info("   %s", t.name)
+    # for zdir, tiffs in groups.items():
+    #     z = zpos[i] if i < len(zpos) else None
+    #     i += 1
+    #     logger.info("Z dir: %s with %d files", zdir.name, len(tiffs))
+    #     for t in tiffs:
+    #         logger.info("   %s", t.name)
 
     rows: List[Dict[str, Any]] = []
 
@@ -82,12 +82,12 @@ def run(input_dir: Path,
             guess = xrv_guess.initial_guess_single_spot(
                 img,
                 median_size=xcfg.get("median_size", 3),
-                snr=xcfg.get("min_snr", 5.0),
-                window_radius=xcfg.get("window_radius", 10),
+                window_radius=xcfg.get("window_radius", 30),
             )
             logger.debug("Initial guess: %s", guess)
 
             fit = xrv_fit.fit_gaussian2d(img, p0=guess)
+
             logger.info("Fit result: %s", fit)
             if fit.get("success") is not True:
                 logger.warning("Fit failed for %s", tpath)

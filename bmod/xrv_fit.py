@@ -35,8 +35,16 @@ def fit_gaussian2d(img: np.ndarray, p0: dict | None = None) -> dict:
 
     p0_vec = [amp, x0, y0, sx, sy, theta, offset]
 
+    # Define bounds
+    bounds = (
+        # Lower bounds: amp (free), x0-10, y0-10, sx-10, sy-10, theta-π/4, offset-0.1*offset
+        [0, x0-10, y0-10, sx-10, sy-10, theta-np.pi/4, offset-0.1*abs(offset)],
+        # Upper bounds: amp (free), x0+10, y0+10, sx+10, sy+10, theta+π/4, offset+0.1*abs(offset)
+        [np.inf, x0+10, y0+10, sx+10, sy+10, theta+np.pi/4, offset+0.1*abs(offset)]
+    )
+
     try:
-        popt, _ = curve_fit(_gauss2d, (x, y), img.ravel(), p0=p0_vec, maxfev=10000)
+        popt, _ = curve_fit(_gauss2d, (x, y), img.ravel(), p0=p0_vec, maxfev=10000, bounds=bounds)
         fit = _gauss2d((x, y), *popt).reshape(h, w)
         resid = img - fit
         rss = float((resid**2).sum())
