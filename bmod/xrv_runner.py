@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class XRVResult:
     file: Path
     z: float
+    energy: float
     amp: float
     x0: float
     y0: float
@@ -42,14 +43,23 @@ def run(input_dir: Path,
 
     # --- config bits
     xcfg = cfg.get("xrv", {})
+
     zpos = xcfg.get("zpos")
     if not isinstance(zpos, (list, tuple)):
         raise ValueError("xrv.zpos must be a list of floats")
     logger.info("Using z positions (n=%d): %s", len(zpos), zpos)
 
+    energies = xcfg.get("energies")
+    if not isinstance(energies, (list, tuple)):
+        raise ValueError("xrv.energies must be a list of floats")
+
+    window_radius = xcfg.get("window_radius", 50)
+    if not isinstance(window_radius, int) or window_radius <= 0:
+        raise ValueError("xrv.window_radius must be a positive integer")
+
     origin = tuple(xcfg.get("origin", (0.0, 0.0)))
     scaling = tuple(xcfg.get("scaling", (1.0, 1.0)))
-    sx_mm_per_px, sy_mm_per_px = scaling
+    sx_px_per_mm, sy_px_per_mm = scaling
 
     groups = xrv_io.find_tiffs_by_z(input_dir)
 
@@ -73,10 +83,13 @@ def run(input_dir: Path,
         else:
             raise ValueError("More z-directories than z-positions")
 
-        for tpath in tiffs:
-            if i >= len(zpos):
-                logger.warning("More z-directories than z-positions; skipping remaining.")
-                break
+        for j, tpath in enumerate(tiffs):
+            logger.info("Processing z=%.3f file %d/%d: %s", z, j+1, len(tiffs), tpath.name)
+            if j < len(energies):
+                energy = energies[j]
+            else:
+                raise ValueError("More files per z than energies")
+
             img = xrv_io.load_tiff(tpath)
 
             guess = xrv_guess.initial_guess_single_spot(
@@ -86,7 +99,7 @@ def run(input_dir: Path,
             )
             logger.debug("Initial guess: %s", guess)
 
-            fit = xrv_fit.fit_gaussian2d(img, p0=guess)
+            fit = xrv_fit.fit_gaussian2d(img, p0=guess, window_radius=window_radius)
 
             logger.info("Fit result: %s", fit)
             if fit.get("success") is not True:
@@ -94,22 +107,23 @@ def run(input_dir: Path,
                 return None
 
             # pixel → mm
-            x_mm = (fit["x0"] - origin[0]) * sx_mm_per_px
-            y_mm = (fit["y0"] - origin[1]) * sy_mm_per_px
-            sx_mm = (fit["sigma_x"]) * sx_mm_per_px
-            sy_mm = (fit["sigma_y"]) * sy_mm_per_px
+            x_mm = (fit["x0"] - origin[0]) / sx_px_per_mm
+            y_mm = (fit["y0"] - origin[1]) / sy_px_per_mm
+            sx_mm = (fit["sigma_x"]) / sx_px_per_mm
+            sy_mm = (fit["sigma_y"]) / sy_px_per_mm
 
             # build one row (pixels + mm)
             row = {
                 "file": str(tpath),
                 "z": z,
+                "energy": energy,
                 # pixels
                 "amp": fit["amp"],
                 "x0_px": fit["x0"],
                 "y0_px": fit["y0"],
                 "sigma_x_px": fit["sigma_x"],
                 "sigma_y_px": fit["sigma_y"],
-                "theta_rad": fit["theta"],
+                "theta_deg": fit["theta"] * 180.0 / 3.141592653589793,
                 "offset": fit["offset"],
                 "r2": fit["r2"],
                 "rss": fit["rss"],

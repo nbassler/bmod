@@ -36,7 +36,7 @@ def main(args=None) -> int:
         logger.error("No input file or directory specified.")
         return 1
 
-    run(input_path, config)
+    run(input_path, config, write=parsed_args.output)
 
     return 0
 

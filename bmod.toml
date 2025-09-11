@@ -4,14 +4,14 @@
 [xrv]
 median_size = 3    # in pixels, for median filter
 min_snr = 5.0      # minimum signal-to-noise ratio to accept fit
-window_radius = 20 # in pixels, for fitting window around maximum
+window_radius = 50 # in pixels, for fitting window around maximum
 
 origin = [
-    802.0867,
-    600.0111,
+    1056.7,
+    596.21,
 ] # horizontal and vertical pixel offset to origin (pixels)
 
-scaling = [3.6224, 3.6263] # horizontal and vertical pixel size (mm/pixel)
+scaling = [3.6224, 3.6263] # horizontal and vertical pixel size (pixels/mm)
 zpos = [-100.0, -50.0, 0.0, 50.0, 100.0, 150.0, 200.0, 250.0]
 energies = [
     244,
