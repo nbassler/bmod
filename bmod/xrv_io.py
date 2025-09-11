@@ -9,7 +9,9 @@ Responsible for:
 """
 
 from pathlib import Path
-from typing import Iterator, List
+from typing import List
+import re
+from typing import Dict
 
 import numpy as np
 from tifffile import imread   # or from PIL import Image
@@ -18,25 +20,39 @@ from tifffile import imread   # or from PIL import Image
 logger = __import__('logging').getLogger(__name__)
 
 
-def find_tiffs(root: Path, extensions: List[str] = [".tif", ".tiff"]) -> Iterator[Path]:
+def natural_key(path: Path) -> List:
     """
-    Recursively find all TIFF files under the given root directory.
+    Sort key that treats digits as numbers (for '1', '2', ..., '10').
+    """
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", path.stem)]
+
+
+def find_tiffs_by_z(root: Path,
+                    extensions: List[str] = [".tif", ".tiff"]) -> Dict[Path, List[Path]]:
+    """
+    Discover TIFF files grouped by z-directory.
 
     Parameters
     ----------
     root : Path
-        The input directory to scan.
+        Root input directory containing subdirectories for each z-position.
     extensions : list of str
-        File extensions to match (default: .tif, .tiff).
+        File extensions to match.
 
-    Yields
-    ------
-    Path
-        Path to each TIFF file discovered.
+    Returns
+    -------
+    dict
+        Mapping: z-directory -> list of sorted TIFF paths inside.
     """
-    for path in root.rglob("*"):
-        if path.suffix.lower() in extensions:
-            yield path
+    groups: Dict[Path, List[Path]] = {}
+
+    for zdir in sorted([p for p in root.iterdir() if p.is_dir()], key=natural_key):
+        tiffs = [p for p in zdir.iterdir() if p.suffix.lower() in extensions]
+        tiffs.sort(key=natural_key)
+        if tiffs:
+            groups[zdir] = tiffs
+
+    return groups
 
 
 def load_tiff(path: Path) -> np.ndarray:
