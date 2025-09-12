@@ -16,13 +16,13 @@ def main(args=None) -> int:
     parser = bmod.config_parser.create_parser()
     parsed_args = parser.parse_args(args)
 
-    # Set up logging based on verbosity
-    if parsed_args.verbosity == 1:
-        logging.basicConfig(level=logging.INFO)
-    elif parsed_args.verbosity > 1:
-        logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)
+    if args.verbosity == 1:
+        logger.setLevel(logging.INFO)
+    elif args.verbosity > 1:
+        logger.setLevel(logging.DEBUG)
     else:
-        logging.basicConfig()
+        logger.setLevel(logging.WARNING)
 
     logger.debug("Parsed args: {:s}".format(str(parsed_args)))
 
