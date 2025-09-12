@@ -1,5 +1,3 @@
-Here's a complete `README.md` file for your bmod project with all the documentation we've discussed:
-
 # Beam Model Generation (bmod)
 
 A Python toolkit for analyzing beam profile measurements from XRV4000 systems and extracting beam optics parameters.
