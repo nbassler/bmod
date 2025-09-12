@@ -9,8 +9,86 @@ def _gauss2d(coords, amp, x0, y0, sx, sy, ct, st, offset):
     yr = -st * (x - x0) + ct * (y - y0)
     return amp * np.exp(-0.5 * ((xr / sx) ** 2 + (yr / sy) ** 2)) + offset
 
+# Simplified Gaussian function (no rotation)
+
+
+def _gauss2d_no_theta(coords, amp, x0, y0, sx, sy, offset):
+    x, y = coords
+    return amp * np.exp(-0.5 * (((x - x0) / sx) ** 2 + ((y - y0) / sy) ** 2)) + offset
+
 
 def fit_gaussian2d(img_full: np.ndarray, p0: dict | None = None, window_radius=50) -> dict:
+    # Crop to local window around initial guess
+    x0_full, y0_full = p0["x0"], p0["y0"]
+    y_slice = slice(max(0, int(y0_full) - window_radius), min(img_full.shape[0], int(y0_full) + window_radius + 1))
+    x_slice = slice(max(0, int(x0_full) - window_radius), min(img_full.shape[1], int(x0_full) + window_radius + 1))
+    img = img_full[y_slice, x_slice]
+
+    # Create local coordinates for the cropped window
+    h, w = img.shape
+    y_local, x_local = np.mgrid[0:h, 0:w]
+
+    # Adjust initial guess to local coordinates
+    x0_local = x0_full - x_slice.start
+    y0_local = y0_full - y_slice.start
+
+    # Use initial guess (local coordinates)
+    amp = p0["amp"]
+    sx = p0["sigma_x"]
+    sy = p0["sigma_y"]
+    offset = p0["offset"]
+
+    # Normalize image to [0, 1] for numerical stability
+    img_normalized = (img - offset) / amp
+
+    p0_vec_normalized = [1.0, x0_local, y0_local, sx, sy, 0.0]  # No theta
+
+    # Define bounds (simplified, no theta)
+    bounds = (
+        [0.5, x0_local-10, y0_local-10, 1.0, 1.0, -0.1],  # Lower bounds
+        [1.5, x0_local+10, y0_local+10, 2*sx, 2*sy, 0.1],   # Upper bounds
+    )
+
+    try:
+        popt, _ = curve_fit(
+            _gauss2d_no_theta,
+            (x_local.ravel(), y_local.ravel()),  # Local coordinates
+            img_normalized.ravel(),
+            p0=p0_vec_normalized,
+            bounds=bounds,
+            maxfev=10000,
+        )
+
+        # Rescale results
+        amp_fit, x0_fit_local, y0_fit_local, sx_fit, sy_fit, offset_fit = popt
+        amp_fit *= amp
+        offset_fit = offset_fit * amp + offset
+
+        # Reshape the fitted model for residuals/R² (local coordinates)
+        fit = _gauss2d_no_theta((x_local, y_local), amp_fit, x0_fit_local,
+                                y0_fit_local, sx_fit, sy_fit, offset_fit).reshape(h, w)
+        resid = img - fit
+        rss = float((resid**2).sum())
+        tss = float(((img - img.mean())**2).sum())
+        r2 = 1.0 - rss / tss if tss > 0 else np.nan
+
+        # Convert fitted coordinates back to full image coordinates
+        x0_fit = x0_fit_local + x_slice.start
+        y0_fit = y0_fit_local + y_slice.start
+
+        return dict(
+            amp=amp_fit, x0=x0_fit, y0=y0_fit, sigma_x=sx_fit, sigma_y=sy_fit,
+            theta=0.0, offset=offset_fit, r2=r2, rss=rss, success=True  # theta fixed to 0
+        )
+    except Exception as e:
+        print(f"Fit failed: {e}")
+        return dict(
+            amp=np.nan, x0=np.nan, y0=np.nan, sigma_x=np.nan, sigma_y=np.nan,
+            theta=np.nan, offset=np.nan, r2=np.nan, rss=np.nan, success=False
+        )
+
+
+def fit_gaussian2d_theta(img_full: np.ndarray, p0: dict | None = None, window_radius=50) -> dict:
     # Crop to local window around initial guess
     x0_full, y0_full = p0["x0"], p0["y0"]
     y_slice = slice(max(0, int(y0_full) - window_radius), min(img_full.shape[0], int(y0_full) + window_radius + 1))
