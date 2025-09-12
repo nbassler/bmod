@@ -11,6 +11,12 @@ def quadratic(z, a, b, c):
     return a * z**2 + b * z + c
 
 
+# def quadratic(z, z0, a, b, c):
+#     """Quadratic function for fitting: σ² = a·L² + b·L + c."""
+#     L = z - z0
+#     return a * L**2 + b * L + c
+
+
 def fit_quadratic(group):
     """Fit quadratic to σ² vs z for both x and y planes."""
     z = group['z'].to_numpy()
