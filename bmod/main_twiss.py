@@ -52,48 +52,58 @@ def fit_all_energies(df):
     return df.groupby('energy').apply(fit_quadratic).reset_index(drop=True)
 
 
-def plot_fits(df, fit_df):
-    """Plot sigma^2 vs z with quadratic fits for each energy."""
+def plot_fits(df, fit_df, output_prefix="fit_plot"):
+    """Plot sigma^2 vs z with cubic fits for each energy, saving each to a separate file."""
     energies = df['energy'].unique()
-    n_energies = len(energies)
-    fig, axes = plt.subplots(n_energies, 1, figsize=(10, 4*n_energies))
-
-    if n_energies == 1:
-        axes = [axes]
 
     for i, energy in enumerate(energies):
+        # Create a new figure for each energy
+        plt.figure(figsize=(10, 6))
+
         group = df[df['energy'] == energy]
         z = group['z'].to_numpy()
         sx = group['sigma_x_mm'].to_numpy()
         sy = group['sigma_y_mm'].to_numpy()
 
         params = fit_df[fit_df['energy'] == energy].iloc[0]
-        ax = axes[i]
 
         # Plot data
-        ax.scatter(z, sx**2, color='blue', label='x data')
-        ax.scatter(z, sy**2, color='orange', label='y data')
+        plt.scatter(z, sx**2, color='blue', label='x data')
+        plt.scatter(z, sy**2, color='orange', label='y data')
 
         # Plot x fit if successful
         if params['x_success']:
             z_fit = np.linspace(min(z), max(z), 100)
-            ax.plot(z_fit, quadratic(z_fit, params['x_a'], params['x_b'], params['x_c']),
-                    '--', color='blue', label='x fit')
+            plt.plot(z_fit, quadratic(z_fit, params['x_a'], params['x_b'], params['x_c']),
+                     '--', color='blue', label='x fit')
 
         # Plot y fit if successful
         if params['y_success']:
             z_fit = np.linspace(min(z), max(z), 100)
-            ax.plot(z_fit, quadratic(z_fit, params['y_a'], params['y_b'], params['y_c']),
-                    '--', color='orange', label='y fit')
+            plt.plot(z_fit, quadratic(z_fit, params['y_a'], params['y_b'], params['y_c']),
+                     '--', color='orange', label='y fit')
 
-        ax.set_xlabel('z (mm)')
-        ax.set_ylabel('Sigma^2 (mm^2)')
-        ax.set_title(f'Energy = {energy} MeV')
-        ax.legend()
-        ax.grid(True)
+        # Add fit parameters as text on the plot
+        fit_info = (
+            f"Energy = {energy} MeV\n"
+            f"X: a={params['x_a']:.2e}, b={params['x_b']:.2e}, c={params['x_c']:.2e}\n"
+            f"Y: a={params['y_a']:.2e}, b={params['y_b']:.2e}, c={params['y_c']:.2e}\n"
+        )
+        plt.text(0.02, 0.95, fit_info, transform=plt.gca().transAxes,
+                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
-    plt.tight_layout()
-    plt.show()
+        plt.xlabel('z (mm)')
+        plt.ylabel('Sigma^2 (mm^2)')
+        plt.title(f'Energy = {energy} MeV')
+        plt.legend()
+        plt.grid(True)
+
+        # Save the figure
+        filename = f"{output_prefix}_energy_{energy:.1f}.png"
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        print(f"Saved plot for energy {energy} MeV to {filename}")
 
 
 def main(input_file, output_file):
@@ -125,7 +135,7 @@ def main(input_file, output_file):
 
     # Plot results
     print("Generating plots...")
-    plot_fits(df, fit_df)
+    plot_fits(df, fit_df, output_prefix="fit_plot")
 
 
 if __name__ == "__main__":
