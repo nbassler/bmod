@@ -4,6 +4,8 @@ Here's a complete `README.md` file for your bmod project with all the documentat
 
 A Python toolkit for analyzing beam profile measurements from XRV4000 systems and extracting beam optics parameters.
 
+<img width="2565" height="1638" alt="fit_plot_cubic_energy_180 0" src="https://github.com/user-attachments/assets/d8175c9c-af5b-415f-bf98-a9234eed543a" />
+
 ## Table of Contents
 1. [Installation](#installation)
 2. [Workflow Overview](#workflow-overview)
@@ -141,7 +143,6 @@ Represents ideal beam propagation in vacuum where:
 σ² = a·(z-z₀)² + b·(z-z₀) + c + d·(z-z₀)³
 
 Extends the quadratic model to account for scattering effects in air, which become more significant at larger distances from the reference point.
-
 
 
 ## Theoretical Background
