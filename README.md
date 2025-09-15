@@ -74,7 +74,7 @@ z0 = -500.0
 ### Step 1: Image Processing
 
 ```bash
-PYTHONPATH=. python3 bmod/main.py -v /path/to/images -o output.csv
+PYTHONPATH=. python3 bmod/xrv_main.py -v /path/to/images -o output.csv
 ```
 
 This will:
