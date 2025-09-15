@@ -17,9 +17,9 @@ def main(args=None) -> int:
     parsed_args = parser.parse_args(args)
 
     logging.basicConfig(level=logging.WARNING)
-    if args.verbosity == 1:
+    if parsed_args.verbosity == 1:
         logger.setLevel(logging.INFO)
-    elif args.verbosity > 1:
+    elif parsed_args.verbosity > 1:
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.WARNING)

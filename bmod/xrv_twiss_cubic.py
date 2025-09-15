@@ -6,13 +6,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def cubic(z, a, b, c, d, z0=-500.0):
+def cubic(z, a, b, c, d, z0=0.0):
     """Cubic function for fitting: σ² = a·(z-z0)² + b·(z-z0) + c + d·(z-z0)^3."""
     L = z - z0
     return a * L**2 + b * L + c + d * L**3
 
 
-def fit_cubic(group, z0=-500.0):
+def fit_cubic(group, z0=0.0):
     """Fit cubic to σ² vs z for both x and y planes."""
     z = group['z'].to_numpy()
     sx = group['sigma_x_mm'].to_numpy()
@@ -26,7 +26,9 @@ def fit_cubic(group, z0=-500.0):
     try:
         # Initial guesses - a, b, c similar to quadratic, d (for L³ term) starts small
         initial_guess_x = [1e-3, 1e-3, 1.0, 1e-6]
-        popt_x, pcov_x = curve_fit(cubic_fixed_z0, z, sx**2, p0=initial_guess_x, maxfev=10000)
+        popt_x, pcov_x = curve_fit(cubic_fixed_z0, z, sx**2, p0=initial_guess_x,
+                                   bounds=([0, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf]),
+                                   maxfev=10000)
         a_x, b_x, c_x, d_x = popt_x
         x_success = True
     except Exception as e:
@@ -38,7 +40,9 @@ def fit_cubic(group, z0=-500.0):
     # Fit y-plane
     try:
         initial_guess_y = [1e-3, 1e-3, 1.0, 1e-6]
-        popt_y, pcov_y = curve_fit(cubic_fixed_z0, z, sy**2, p0=initial_guess_y, maxfev=10000)
+        popt_y, pcov_y = curve_fit(cubic_fixed_z0, z, sy**2, p0=initial_guess_y,
+                                   bounds=([0, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf]),
+                                   maxfev=10000)
         a_y, b_y, c_y, d_y = popt_y
         y_success = True
     except Exception as e:

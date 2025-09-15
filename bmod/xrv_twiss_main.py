@@ -2,6 +2,8 @@ import argparse
 import logging
 from xrv_twiss_quadratic import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
 from xrv_twiss_cubic import fit_all_energies as fit_cubic, plot_fits as plot_cubic
+# from xrv_twiss_quadratic_bspline import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
+# from xrv_twiss_cubic_bspline import fit_all_energies as fit_cubic, plot_fits as plot_cubic
 from __version__ import __version__
 
 # Get a logger for this module
