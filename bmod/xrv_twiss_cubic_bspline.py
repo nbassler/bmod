@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from dataclasses import dataclass
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -115,7 +115,7 @@ def _fit_plane_global(
     # Build spline basis B(E) -> [N x n_bases]
     B, knots = _make_bspline_basis(E_n, degree=degree, n_bases=n_bases)  # N x K
     K = B.shape[1]
-    N = B.shape[0]
+    # N = B.shape[0]   # not used
 
     # Build z polynomial columns
     L = z - float(z0)
@@ -208,7 +208,7 @@ def _eval_coeffs_at_energies(fit: _PlaneFit, energies: np.ndarray) -> Tuple[np.n
 
 def fit_all_energies(
     df: pd.DataFrame,
-    z0: float = -500.0,
+    z0: float = 0.0,
     *,
     n_bases: int = 8,
     degree: int = 3,
@@ -268,7 +268,7 @@ def plot_fits(
     df: pd.DataFrame,
     fit_df: pd.DataFrame,
     output_prefix: str = "fit_plot",
-    z0: float = -500.0
+    z0: float = 0.0
 ) -> None:
     """
     Plot σ² vs z with global cubic-in-L fits for each energy.

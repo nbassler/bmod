@@ -4,12 +4,14 @@ import logging
 
 import bmod.config_parser
 
-from bmod.xrv_runner import run
+from bmod.grf_runner import run
 
 logger = logging.getLogger(__name__)
 
 
 def main(args=None) -> int:
+    logger.debug("bmod.main called")
+
     logging.basicConfig(level=logging.WARNING)
 
     # call parser:

@@ -1,16 +1,16 @@
 import argparse
 import logging
-from xrv_twiss_quadratic import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
-from xrv_twiss_cubic import fit_all_energies as fit_cubic, plot_fits as plot_cubic
-# from xrv_twiss_quadratic_bspline import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
-# from xrv_twiss_cubic_bspline import fit_all_energies as fit_cubic, plot_fits as plot_cubic
+# from xrv_twiss_quadratic import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
+# from xrv_twiss_cubic import fit_all_energies as fit_cubic, plot_fits as plot_cubic
+from xrv_twiss_quadratic_bspline import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
+from xrv_twiss_cubic_bspline import fit_all_energies as fit_cubic, plot_fits as plot_cubic
 from __version__ import __version__
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)
 
 
-def main(input_file, output_file, z0=-500.0):
+def main(input_file, output_file, z0=0.0):
     """Main function: load data, fit quadratics and cubics, and plot results."""
     import pandas as pd  # Import here to avoid global namespace pollution
     # Load data
@@ -72,18 +72,20 @@ def main(input_file, output_file, z0=-500.0):
 
 
 if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.WARNING)  # must be setup before setting up the parser
+
     parser = argparse.ArgumentParser(description="Fit quadratic and cubic functions to beam size data.")
     parser.add_argument("input_file", type=str, help="Input CSV file (e.g., out.csv)")
     parser.add_argument("output_file", type=str, help="Output CSV file for combined results (e.g., combined_fits.csv)")
-    parser.add_argument('--z0', type=float, default=-500.0,
-                        help="Offset for z coordinate (default: -500.0 mm)")
+    parser.add_argument('--z0', type=float, default=0.0,
+                        help="Offset for z coordinate (default: 0.0 mm)")
     parser.add_argument('-v', '--verbosity', action='count', default=0,
                         help="Increase verbosity (can use -v, -vv, etc.).")
     parser.add_argument('-V', '--version', action='version', version=__version__,
                         help="Show version and exit.")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.WARNING)
     if args.verbosity == 1:
         logger.setLevel(logging.INFO)
     elif args.verbosity > 1:

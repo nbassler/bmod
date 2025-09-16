@@ -140,7 +140,7 @@ def _eval_coeffs(fit: _PlaneFit, energies: np.ndarray) -> tuple[np.ndarray, np.n
 
 
 def fit_all_energies(
-    df: pd.DataFrame, z0: float = -500.0,
+    df: pd.DataFrame, z0: float = 0.0,
     *, n_bases: int = 8, degree: int = 3,
     lambda_reg_xy: tuple[float, float, float] = (1e-2, 1e-2, 1e-2),
     weight_col: Optional[str] = None,
@@ -183,7 +183,7 @@ def fit_all_energies(
 
 def plot_fits(
     df: pd.DataFrame, fit_df: pd.DataFrame,
-    output_prefix: str = "fit_plot", z0: float = -500.0
+    output_prefix: str = "fit_plot", z0: float = 0.0
 ) -> None:
     """Same plotting API; draws σ² vs z and the quadratic fits per energy."""
     # fast lookup
