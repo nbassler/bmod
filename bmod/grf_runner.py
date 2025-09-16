@@ -1,81 +1,147 @@
 from __future__ import annotations
-# from dataclasses import dataclass
+from bmod.grf_git import calculate_d80_for_all_curves
 from pathlib import Path
 from typing import Optional, Dict, Any
-
 import logging
 import pandas as pd
 import os
-# import numpy as np
-
 
 logger = logging.getLogger(__name__)
 
 
 def load_giraffe_csv(input_file: Path) -> pd.DataFrame:
     """
-    Load Giraffe CSV file and return a DataFrame with depth and gain data.
-    Note, the CSV file has a non-standard format, so we need to parse it manually.
+    Load depth values and all curve data from Giraffe CSV file.
+    Returns a DataFrame with depth values and multiple curve columns.
     """
-    depths, gains = [], []
+    depth_values = None
+    curves = {}
+    current_curve = None
+
     with open(input_file, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
-            if line.startswith("Curve depth"):
-                depths = [float(x) for x in next(f).strip().split(";") if x]
-            if line.startswith("Curve gains"):
-                gains = [float(x) for x in next(f).strip().split(";") if x]
-    if not depths or not gains:
-        raise ValueError("Could not find curve data in file")
-    return pd.DataFrame({"depth_mm": depths, "gain_counts": gains})
+            line = line.strip()
+            if not line:
+                continue
+
+            # Look for curve headers
+            if line.startswith("Curve"):
+                current_curve = line.split(":")[0].strip()
+                curves[current_curve] = []
+                continue
+
+            if line.startswith("Samples"):
+                continue
+
+            # Parse curve data
+            if current_curve:
+                values = [float(x) for x in line.split(";") if x]
+                curves[current_curve].extend(values)
+
+                # Store depth values when we find them
+                if "depth" in current_curve.lower() and depth_values is None:
+                    depth_values = values.copy()
+                continue
+
+    if depth_values is None:
+        raise ValueError("No depth values found in file")
+
+    if not curves:
+        raise ValueError("No curve data found in file")
+
+    # Verify all curves have the same length as depth values
+    expected_length = len(depth_values)
+    for curve_name, values in curves.items():
+        if len(values) % expected_length != 0:
+            raise ValueError(f"Curve {curve_name} has {len(values)} values, not a multiple of {expected_length}")
+
+    # Create DataFrame with depth and all curves
+    df = pd.DataFrame({"depth_mm": depth_values})
+
+    # Add each curve as a separate column
+    for curve_name, values in curves.items():
+        if "depth" not in curve_name.lower():  # Skip depth curve
+            # Handle multiple measurements if present
+            num_measurements = len(values) // expected_length
+            for i in range(num_measurements):
+                start = i * expected_length
+                end = (i + 1) * expected_length
+                measurement_values = values[start:end]
+                df[f"{curve_name}_{i+1}"] = measurement_values
+
+    return df
 
 
 def load_giraffe_dir(input_dir: Path) -> dict[str, pd.DataFrame]:
     """
-    Loop through all .csv files in a directory and parse them.
-    Returns a dictionary: {filename: dataframe}.
+    Load depth and curve data from all CSV files in directory.
+    Returns dictionary: {filename: dataframe_with_curves}
     """
     results = {}
-    for fname in os.listdir(input_dir):
-        if fname.lower().endswith(".csv"):
-            fpath = os.path.join(input_dir, fname)
-            try:
-                results[fname] = load_giraffe_csv(fpath)
-            except Exception as e:
-                print(f"⚠️ Skipping {fname}: {e}")
+    csv_files = sorted(fname for fname in os.listdir(input_dir) if fname.lower().endswith(".csv"))
+
+    for fname in csv_files:
+        fpath = os.path.join(input_dir, fname)
+        try:
+            df = load_giraffe_csv(Path(fpath))
+            results[fname] = df
+            print(f"✅ Successfully loaded {fname} with {len(df.columns)} columns")
+        except Exception as e:
+            print(f"⚠️ Skipping {fname}: {str(e)}")
+
     return results
 
 
 def run(input_dir: Path,
         cfg: Dict[str, Any] | Any,
-        write: Optional[Path] = None) -> pd.DataFrame:
+        output_file_path: Optional[Path] = None) -> pd.DataFrame:
     """
-    Top-level pipeline for Giraffe processing.
+    Pipeline for Giraffe processing - extracts depth and curve data.
+    Returns a multi-index DataFrame with all measurements.
     """
-    logger.info("Giraffe runner started: %s", input_dir)
+    logger.debug("Giraffe runner started: %s", input_dir)
 
-    # --- config bits
-    gcfg = cfg.get("giraffe", {})
-
-    # --- load data
     if not input_dir.exists():
         raise FileNotFoundError(f"Input path does not exist: {input_dir}")
-    if input_dir.is_file():
-        data = {input_dir.name: load_giraffe_csv(input_dir)}
-    elif input_dir.is_dir():
-        data = load_giraffe_dir(input_dir)
-    else:
-        raise ValueError(f"Input path is neither a file nor a directory: {input_dir}")
 
-    # log debug list of energies and wet value
-    energies = gcfg.get("energies", [])
-    logger.debug(f"Configured energies: {energies}")
-    wet = gcfg.get("wet", 1.125)
-    logger.debug(f"Configured water equivalent thickness (wet): {wet} cm")
+    logger.debug(f"Loading data from directory: {input_dir}")
+    data = load_giraffe_dir(input_dir)
 
-    # list all data dict:
+    if not data:
+        return pd.DataFrame()
+
+    # Create a multi-level DataFrame structure
+    all_dfs = []
+
+    i = 1
     for fname, df in data.items():
-        logger.info(f"Processing file: {fname} with {len(df)} data points")
-        # placeholder for actual processing logic
-        # e.g., calibrate gains, fit curves, etc.
-        # For now, just log the first few rows
-        logger.debug(f"Data preview:\n{df.head()}")
+        # Add measurement source identifier
+        df = df.copy()
+        df.insert(0, 'fname', fname)
+        df.insert(1, 'id', i)
+        all_dfs.append(df)
+        i += 1
+
+    all_dfs = pd.concat(all_dfs, ignore_index=True)
+
+    if output_file_path:
+        logger.info(f"Writing output to: {output_file_path}")
+
+        # Save the consolidated data
+        all_dfs.to_csv(output_file_path, index=False)
+        logger.debug(f"Saved consolidated data to {output_file_path}")
+
+    # process all_dfs:
+    # Calculate D80 for all curves
+    result_df = calculate_d80_for_all_curves(all_dfs)
+
+    if output_file_path:
+        # build a new path based on output_file_path, but with suffix _d80.csv
+        d80_output_path = output_file_path.with_name(output_file_path.stem + "_d80.csv")
+        # Save the results with D80 values
+        result_df.to_csv(d80_output_path, index=False)
+        logger.debug(f"Saved results with D80 values to {d80_output_path}")
+
+    return result_df
+
+    return all_dfs

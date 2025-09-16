@@ -6,13 +6,14 @@ import bmod.config_parser
 
 from bmod.grf_runner import run
 
-logger = logging.getLogger(__name__)
-
 
 def main(args=None) -> int:
-    logger.debug("bmod.main called")
 
+    # setup root logger:
     logging.basicConfig(level=logging.WARNING)
+
+    # setup module logger:
+    logger = logging.getLogger("bmod")
 
     # call parser:
     parser = bmod.config_parser.create_parser()
@@ -37,7 +38,9 @@ def main(args=None) -> int:
         logger.error("No input file or directory specified.")
         return 1
 
-    run(input_path, config, write=parsed_args.output)
+    logger.info(f"Processing input: {input_path}")
+    run(input_path, config, output_file_path=parsed_args.output)
+    logger.debug("bmod.main done")
 
     return 0
 
