@@ -203,38 +203,49 @@ def plot_fits(
     df: pd.DataFrame, fit_df: pd.DataFrame,
     output_prefix: str = "fit_plot", z0: float = 0.0
 ) -> None:
-    """Plot σ² vs z and the quadratic fits per energy, using the original fit reference z0."""
+    """Plot σ vs z and the quadratic fits per energy, showing derived x and y parameters at z'."""
     fmap = {float(r["energy"]): r for _, r in fit_df.iterrows()}
     for energy in df["energy"].unique():
         energy = float(energy)
         g = df[df["energy"] == energy]
         z = g["z"].to_numpy(float)
-        sx2 = np.square(g["sigma_x_mm"].to_numpy(float))
-        sy2 = np.square(g["sigma_y_mm"].to_numpy(float))
+        sx = g["sigma_x_mm"].to_numpy(float)
+        sy = g["sigma_y_mm"].to_numpy(float)
         p = fmap[energy]
-        z0_use = float(p.get("z0", z0))  # Use the original fit reference
-        z_prime = p["z"]  # The derived parameter reference
-        z_fit = np.linspace(np.min(z), np.max(z), 200)
+        z0_use = float(p.get("z0", z0))  # Original fit reference
+        z_prime = p["z"]  # Derived parameter reference
+
+        # Extend z_fit range to include z_prime
+        z_min = min(np.min(z), z_prime - 50)
+        z_max = max(np.max(z), z_prime + 50)
+        z_fit = np.linspace(z_min, z_max, 200)
+
         L = z_fit - z0_use
-        x_fit = p["x_a"]*L**2 + p["x_b"]*L + p["x_c"]
-        y_fit = p["y_a"]*L**2 + p["y_b"]*L + p["y_c"]
+        # Calculate sigma from sigma² fits
+        x_fit = np.sqrt(np.clip(p["x_a"]*L**2 + p["x_b"]*L + p["x_c"], 0.0, None))
+        y_fit = np.sqrt(np.clip(p["y_a"]*L**2 + p["y_b"]*L + p["y_c"], 0.0, None))
+
         plt.figure(figsize=(10, 6))
-        plt.scatter(z, sx2, label="x data")
-        plt.scatter(z, sy2, label="y data")
+        plt.scatter(z, sx, label="x data")
+        plt.scatter(z, sy, label="y data")
         plt.plot(z_fit, x_fit, "--", label="x fit")
         plt.plot(z_fit, y_fit, "--", label="y fit")
+
+        # Mark z0 and z' on the plot for clarity
+        plt.axvline(x=z0_use, color="gray", linestyle=":", label=f"Fit ref z0 = {z0_use:.1f} mm")
+        plt.axvline(x=z_prime, color="red", linestyle=":", label=f"Params ref z' = {z_prime:.1f} mm")
+
         txt = (
             f"Energy = {energy:.1f} MeV\n"
             f"Fit ref z0 = {z0_use:.1f} mm\n"
             f"Params at z' = {z_prime:.1f} mm\n"
-            f"X: a={p['x_a']:.2e}, b={p['x_b']:.2e}, c={p['x_c']:.2e}\n"
-            f"Y: a={p['y_a']:.2e}, b={p['y_b']:.2e}, c={p['y_c']:.2e}\n"
-            f"Derived: x={p['x']:.3f}, x'={p['x\'']:.3f}, xx'={p['xx\'']:.3f}"
+            f"Derived X: x={p['x']:.3f}, x'={p['x\'']:.3f}, xx'={p['xx\'']:.3f}\n"
+            f"Derived Y: y={p['y']:.3f}, y'={p['y\'']:.3f}, yy'={p['yy\'']:.3f}"
         )
         plt.text(0.02, 0.95, txt, transform=plt.gca().transAxes,
                  va="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
         plt.xlabel("z (mm)")
-        plt.ylabel("σ² (mm²)")
+        plt.ylabel("σ (mm)")
         plt.title(f"Energy = {energy:.1f} MeV")
         plt.grid(True)
         plt.legend()
