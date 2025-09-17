@@ -130,28 +130,25 @@ def main(args=None) -> int:
     cubic_fit_df.to_csv(cubic_output_file, index=False)
     logger.info(f"Cubic fit parameters saved to {cubic_output_file}")
 
+    # Fit cubics
+    logger.info("Fitting cubic functions...")
+    cubic_fit_df = fit_cubic(df, z0=z0, z_prime=z_beam_start, zdir_negative=zdir_negative)
+    # Save cubic results
+    cubic_output_file = output_file.replace('.csv', '_cubic.csv')
+    cubic_fit_df.to_csv(cubic_output_file, index=False)
+    logger.info(f"Cubic fit parameters saved to {cubic_output_file}")
     # Print cubic summary
     x_success = cubic_fit_df['x_success'].sum()
     y_success = cubic_fit_df['y_success'].sum()
     total = len(cubic_fit_df)
-
     logger.info(f"Cubic fit success rate: x-plane {x_success}/{total}, y-plane {y_success}/{total}")
-    logger.info("\nFitted cubic parameters (σ² = a·(z-z0)² + b·(z-z0) + c + d·(z-z0)^3):")
-    logger.info(cubic_fit_df[['energy', 'z0', 'x_a', 'x_b', 'x_c', 'x_d',
-                              'y_a', 'y_b', 'y_c', 'y_d']].to_string(index=False))
     logger.info("\nDerived beam parameters from cubic fit:")
     logger.info(cubic_fit_df[['energy', 'x', 'y', "x'", "y'", 'xx\'', 'yy\'']].to_string(index=False))
-
     # Plot cubic fits
-    logger.info("Generating cubic fit plots...")
-    plot_cubic(df, cubic_fit_df, output_prefix="fit_plot_cubic", z0=z0)
+    if not args.no_plot:
+        logger.info("Generating cubic fit plots...")
+        plot_cubic(df, cubic_fit_df, output_prefix="fit_plot_cubic", z0=z0)
 
-    # Combine results into a single output file
-    # quad_df = quad_fit_df.add_prefix('quad_')
-    # cubic_df = cubic_fit_df.add_prefix('cubic_')
-    # combined_df = pd.concat([quad_df, cubic_df], axis=1)
-    # combined_df.to_csv(output_file, index=False)
-    # logger.info(f"Combined fit parameters saved to {output_file}")
     return 0
 
 
