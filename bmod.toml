@@ -11,8 +11,10 @@ origin = [
     596.21,
 ] # horizontal and vertical pixel offset to origin (pixels)
 
-scaling = [3.6224, 3.6263] # horizontal and vertical pixel size (pixels/mm)
+scaling = [3.6224, 3.6263]                                    # horizontal and vertical pixel size (pixels/mm)
 zpos = [-100.0, -50.0, 0.0, 50.0, 100.0, 150.0, 200.0, 250.0]
+
+
 energies = [
     244,
     240,

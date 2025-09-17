@@ -1,7 +1,7 @@
 # xrv_energyfit_quadratic.py
 from __future__ import annotations
 import logging
-from typing import Tuple, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -140,7 +140,10 @@ def _eval_coeffs(fit: _PlaneFit, energies: np.ndarray) -> tuple[np.ndarray, np.n
 
 
 def fit_all_energies(
-    df: pd.DataFrame, z0: float = 0.0,
+    df: pd.DataFrame,
+    z0: float = 0.0,
+    z_prime: float = 0.0,
+    zdir_negative: bool = True,
     *, n_bases: int = 8, degree: int = 3,
     lambda_reg_xy: tuple[float, float, float] = (1e-2, 1e-2, 1e-2),
     weight_col: Optional[str] = None,
@@ -163,32 +166,45 @@ def fit_all_energies(
     Ax, Bx, Cx = _eval_coeffs(fit_x, energies)
     Ay, By, Cy = _eval_coeffs(fit_y, energies)
 
-    # Derived at L=0
-    x = np.sqrt(np.clip(Cx, 0.0, None))
-    y = np.sqrt(np.clip(Cy, 0.0, None))
-    xp = np.sqrt(np.clip(Ax, 0.0, None))
-    yp = np.sqrt(np.clip(Ay, 0.0, None))
-    xxp = Bx / 2.0
-    yyp = By / 2.0
+    # σ^2(z,E) = A(E) L^2 + B(E) L + C(E),  L = z - z0
+
+    x, xp, xxp = derived_params_at_zprime(Ax, Bx, Cx, z_prime)
+    y, yp, yyp = derived_params_at_zprime(Ay, By, Cy, z_prime)
 
     out = pd.DataFrame({
         "energy": energies,
-        "x_a": Ax, "x_b": Bx, "x_c": Cx, "x_success": True,
-        "y_a": Ay, "y_b": By, "y_c": Cy, "y_success": True,
-        "x": x, "y": y, "x'": xp, "y'": yp, "xx'": xxp, "yy'": yyp,
-        "z0": float(z0),
+        "x_a": Ax, "x_b": Bx, "x_c": Cx,
+        "y_a": Ay, "y_b": By, "y_c": Cy,
+        "x_success": True,
+        "y_success": True,
+        "x": x, "y": y, "x'": xp,
+        "y'": yp, "xx'": xxp, "yy'": yyp,
+        "z": float(z_prime),
     })
     return out
+
+
+def shift_reference(A, B, C, z_prime):
+    A_prime = A
+    B_prime = 2 * A * z_prime + B
+    C_prime = A * z_prime**2 + B * z_prime + C
+    return A_prime, B_prime, C_prime
+
+
+def derived_params_at_zprime(A, B, C, z_prime):
+    A_prime, B_prime, C_prime = shift_reference(A, B, C, z_prime)
+    x = np.sqrt(np.clip(C_prime, 0.0, None))
+    xp = np.sqrt(np.clip(A_prime, 0.0, None))
+    xxp = B_prime / 2.0
+    return x, xp, xxp
 
 
 def plot_fits(
     df: pd.DataFrame, fit_df: pd.DataFrame,
     output_prefix: str = "fit_plot", z0: float = 0.0
 ) -> None:
-    """Same plotting API; draws σ² vs z and the quadratic fits per energy."""
-    # fast lookup
+    """Plot σ² vs z and the quadratic fits per energy, using the original fit reference z0."""
     fmap = {float(r["energy"]): r for _, r in fit_df.iterrows()}
-
     for energy in df["energy"].unique():
         energy = float(energy)
         g = df[df["energy"] == energy]
@@ -196,22 +212,25 @@ def plot_fits(
         sx2 = np.square(g["sigma_x_mm"].to_numpy(float))
         sy2 = np.square(g["sigma_y_mm"].to_numpy(float))
         p = fmap[energy]
-        z0_use = float(p.get("z0", z0))
-
+        z0_use = float(p.get("z0", z0))  # Use the original fit reference
+        z_prime = p["z"]  # The derived parameter reference
         z_fit = np.linspace(np.min(z), np.max(z), 200)
         L = z_fit - z0_use
         x_fit = p["x_a"]*L**2 + p["x_b"]*L + p["x_c"]
         y_fit = p["y_a"]*L**2 + p["y_b"]*L + p["y_c"]
-
         plt.figure(figsize=(10, 6))
         plt.scatter(z, sx2, label="x data")
         plt.scatter(z, sy2, label="y data")
         plt.plot(z_fit, x_fit, "--", label="x fit")
         plt.plot(z_fit, y_fit, "--", label="y fit")
-        txt = (f"Energy = {energy:.1f} MeV\n"
-               f"z0 = {z0_use:.1f} mm\n"
-               f"X: a={p['x_a']:.2e}, b={p['x_b']:.2e}, c={p['x_c']:.2e}\n"
-               f"Y: a={p['y_a']:.2e}, b={p['y_b']:.2e}, c={p['y_c']:.2e}")
+        txt = (
+            f"Energy = {energy:.1f} MeV\n"
+            f"Fit ref z0 = {z0_use:.1f} mm\n"
+            f"Params at z' = {z_prime:.1f} mm\n"
+            f"X: a={p['x_a']:.2e}, b={p['x_b']:.2e}, c={p['x_c']:.2e}\n"
+            f"Y: a={p['y_a']:.2e}, b={p['y_b']:.2e}, c={p['y_c']:.2e}\n"
+            f"Derived: x={p['x']:.3f}, x'={p['x\'']:.3f}, xx'={p['xx\'']:.3f}"
+        )
         plt.text(0.02, 0.95, txt, transform=plt.gca().transAxes,
                  va="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
         plt.xlabel("z (mm)")
