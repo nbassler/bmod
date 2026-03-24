@@ -2,7 +2,9 @@
 
 A Python toolkit for analyzing beam profile measurements from XRV4000 systems and extracting beam optics parameters.
 
-<img width="2565" height="1638" alt="fit_plot_cubic_energy_180 0" src="https://github.com/user-attachments/assets/d8175c9c-af5b-415f-bf98-a9234eed543a" />
+<img width="2539" height="1638" alt="image" src="https://github.com/user-attachments/assets/7f55df9d-747a-4286-b5d2-a3cccf72ca11" />
+
+
 
 ## Table of Contents
 1. [Installation](#installation)
@@ -50,25 +52,7 @@ data_root/
 
 ## Configuration
 
-Create a `bmod.toml` file in your working directory:
-
-```toml
-# Example configuration file
-
-# Positions in mm (order must match directory numbering)
-zpos = [-100.0, -50.0, 0.0, 50.0, 100.0, 150.0, 200.0, 250.0]
-
-# Energies in MeV (order must match file numbering)
-energies = [
-    244, 240, 230, 220, 210, 200, 190, # field 1
-    180, 170, 160, 150, 140, 130, 120, 115, 110, # field 2
-    105, 100, 95, 90, 85, 80, 75, 70,  # field 3
-]
-
-# Reference position (mm) for fitting
-z0 = -500.0
-```
-
+Create a `bmod.toml` file in your working directory.
 ## Running the Analysis
 
 ### Step 1: Image Processing
