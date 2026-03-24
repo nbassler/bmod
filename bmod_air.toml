@@ -1,0 +1,68 @@
+# configuration file for bmod, where user can set input options
+
+
+[xrv]
+median_size = 3    # in pixels, for median filter
+min_snr = 5.0      # minimum signal-to-noise ratio to accept fit
+window_radius = 80 # in pixels, for fitting window around maximum
+
+origin = [40, 40] # horizontal and vertical pixel offset to origin (pixels)
+
+scaling = [2.0, 2.0] # horizontal and vertical pixel size (pixels/mm)
+
+# absolute depth positions (mm) for XRV measurements in IEC nozzle coordinates
+# these must be ordered starting at upstream position and ending at downstream position
+zpos = [-100.0, -50.0, 0.0, 50.0, 100.0, 150.0, 200.0, 250.0]
+
+
+energies = [
+    244,
+    240,
+    230,
+    220,
+    210,
+    200,
+    190, # field 1
+    180,
+    170,
+    160,
+    150,
+    140,
+    130,
+    120,
+    115, # field 2
+    110,
+    105,
+    100,
+    95,
+    90,
+    85,
+    80,
+    75,
+    70,  # field 3
+]
+
+[idd]
+# depth positions (mm) for IDD measurements
+zpos = [-100.0, -50.0, 0.0, 50.0, 100.0, 150.0, 200.0, 250.0]
+
+[giraffe]
+energies = [
+    220,
+    210,
+    200,
+    190,
+    180,
+    170,
+    160,
+    150,
+    140,
+    130,
+    120,
+    110,
+    100,
+    90,
+    80,
+    70,
+]
+wet = 1.125 # cm
