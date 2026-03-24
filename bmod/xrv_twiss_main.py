@@ -1,10 +1,9 @@
 import argparse
 import logging
 import sys
-from zipfile import Path
+from pathlib import Path
 import pandas as pd
-# from xrv_twiss_quadratic import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
-# from xrv_twiss_cubic import fit_all_energies as fit_cubic, plot_fits as plot_cubic
+
 from bmod.xrv_twiss_quadratic_bspline import fit_all_energies as fit_quadratic, plot_fits as plot_quadratic
 from bmod.xrv_twiss_cubic_bspline import fit_all_energies as fit_cubic, plot_fits as plot_cubic
 from bmod.__version__ import __version__
@@ -21,11 +20,11 @@ def setup_parser():
     parser.add_argument('-a', '--air_input', type=Path, default=None,
                         help="Path to input CSV file or panda .parquet (optional).")
     parser.add_argument('--z0', type=float, default=0.0,
-                        help="Reference point for fitting, should be well surrounded by data points (default: 0.0 mm)")
-    parser.add_argument('--z_beam_start', type=float, default=500.0,
-                        help="Position for which the derived Twiss parameters will be prepared for (default: +500.0 mm)")
-    parser.add_argument('--zdir_negative', action='store_true', default=True,
-                        help="Beam travels in negative z direction. (default: True)")
+                        help="IEC z reference point to guide the fitting, "
+                        "should be well surrounded by data points (default: 0.0 mm)")
+    parser.add_argument('--sad', type=float, default=500.0,
+                        help="Source-Axis Distance: distance from beam source to isocenter "
+                        "(IEC z=0) in mm (default: 500.0 mm)")
     parser.add_argument('--no-plot', action='store_true', default=False,
                         help="Do not generate plots.")
     parser.add_argument('--cubic', action='store_true', default=False,
@@ -39,18 +38,22 @@ def setup_parser():
 
 def subtract_air(df, df_air):
     """Subtract air data from measurement data based on matching energy levels
-     and matching positions (z). Modifies df in place."""
+     and matching positions (z, IEC nozzle coordinates). Modifies df in place."""
     energies = df['energy'].unique()
     for energy in energies:
         air_subset = df_air[df_air['energy'] == energy]
+
         if air_subset.empty:
             logger.warning(f"No matching air data for energy {energy}. Skipping air subtraction for this energy.")
             continue
+
         for z in df['z'].unique():
             air_row = air_subset[air_subset['z'] == z]
+
             if air_row.empty:
                 logger.warning(f"No matching air data for energy {energy} at z={z}. Skipping this position.")
                 continue
+
             mask = (df['energy'].round().astype(int) == round(energy)) & (df['z'].round().astype(int) == round(z))
             df.loc[mask, 'sigma_x_mm'] = (df.loc[mask, 'sigma_x_mm']**2 -
                                           air_row['sigma_x_mm'].values[0]**2).clip(lower=0).pow(0.5)
@@ -69,9 +72,8 @@ def main(args=None) -> int:
     input_file = args.input_file
     output_file = args.output_file
     air_file = args.air_input
-    z0 = args.z0
-    z_beam_start = args.z_beam_start
-    zdir_negative = args.zdir_negative
+    sad = args.sad
+    s0 = sad - args.z0  # convert IEC z0 to beam-relative s0
 
     if input_file is None or output_file is None:
         parser.print_help()
@@ -89,6 +91,10 @@ def main(args=None) -> int:
     df = pd.read_csv(input_file)
     logger.info(f"Data loaded. Found {len(df['energy'].unique())} unique energy levels.")
 
+    # Compute beam-relative coordinate: s=0 at beam start (IEC z=sad), s=sad at isocenter (IEC z=0)
+    # s: beam-relative coordinate, s=0 at source, s=sad at isocenter (Fermi-Eyges convention)
+    df['s'] = sad - df['z']
+
     if air_file is not None:
         logger.info(f"Loading air data from {air_file}...")
         if air_file.suffix == '.parquet':
@@ -96,11 +102,13 @@ def main(args=None) -> int:
         else:
             df_air = pd.read_csv(air_file)
         logger.info(f"Air data loaded. Found {len(df_air['energy'].unique())} unique energy levels.")
+        df_air['s'] = sad - df_air['z']
         subtract_air(df, df_air)
 
     # Fit quadratics
     logger.info("Fitting quadratic functions...")
-    quad_fit_df = fit_quadratic(df, z0=z0, z_prime=z_beam_start, zdir_negative=zdir_negative)
+    quad_fit_df = fit_quadratic(df, s0=s0, s_prime=0.0)
+
     # Save quadratic results
     quad_output_file = output_file.replace('.csv', '_quadratic.csv')
     quad_fit_df.to_csv(quad_output_file, index=False)
@@ -117,26 +125,20 @@ def main(args=None) -> int:
     # Plot quadratic fits
     if not args.no_plot:
         logger.info("Generating quadratic fit plots...")
-        plot_quadratic(df, quad_fit_df, output_prefix="fit_plot_quadratic", z0=z0)
+        plot_quadratic(df, quad_fit_df, output_prefix="fit_plot_quadratic", s0=s0)
 
     if not args.cubic:
         return 0
 
     # the rest of the code is only executed if cubic fits are requested
     logger.info("Fitting cubic functions...")
-    cubic_fit_df = fit_cubic(df, z0=z0)
+    cubic_fit_df = fit_cubic(df, s0=s0, s_prime=0.0)
+
     # Save cubic results
     cubic_output_file = output_file.replace('.csv', '_cubic.csv')
     cubic_fit_df.to_csv(cubic_output_file, index=False)
     logger.info(f"Cubic fit parameters saved to {cubic_output_file}")
 
-    # Fit cubics
-    logger.info("Fitting cubic functions...")
-    cubic_fit_df = fit_cubic(df, z0=z0, z_prime=z_beam_start, zdir_negative=zdir_negative)
-    # Save cubic results
-    cubic_output_file = output_file.replace('.csv', '_cubic.csv')
-    cubic_fit_df.to_csv(cubic_output_file, index=False)
-    logger.info(f"Cubic fit parameters saved to {cubic_output_file}")
     # Print cubic summary
     x_success = cubic_fit_df['x_success'].sum()
     y_success = cubic_fit_df['y_success'].sum()
@@ -144,10 +146,11 @@ def main(args=None) -> int:
     logger.info(f"Cubic fit success rate: x-plane {x_success}/{total}, y-plane {y_success}/{total}")
     logger.info("\nDerived beam parameters from cubic fit:")
     logger.info(cubic_fit_df[['energy', 'x', 'y', "x'", "y'", 'xx\'', 'yy\'']].to_string(index=False))
+
     # Plot cubic fits
     if not args.no_plot:
         logger.info("Generating cubic fit plots...")
-        plot_cubic(df, cubic_fit_df, output_prefix="fit_plot_cubic", z0=z0)
+        plot_cubic(df, cubic_fit_df, output_prefix="fit_plot_cubic", s0=s0)
 
     return 0
 
