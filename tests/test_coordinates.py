@@ -1,8 +1,9 @@
 """Tests for beam-relative coordinate system and derived parameter evaluation."""
+
 import numpy as np
 import pandas as pd
 import pytest
-from bmod.xrv_twiss_quadratic_bspline import derived_params_at_zprime, fit_all_energies
+from bmod.xrv_twiss_quadratic_bspline import derived_params_at_sprime, fit_all_energies
 
 
 SAD = 500.0  # typical source-axis distance in mm
@@ -12,8 +13,8 @@ def test_z_to_s_mapping():
     """Isocenter (IEC z=0) maps to s=SAD; beam start (IEC z=SAD) maps to s=0."""
     z = np.array([0.0, SAD, SAD / 2])
     s = SAD - z
-    assert s[0] == pytest.approx(SAD)    # isocenter
-    assert s[1] == pytest.approx(0.0)    # beam start
+    assert s[0] == pytest.approx(SAD)  # isocenter
+    assert s[1] == pytest.approx(0.0)  # beam start
     assert s[2] == pytest.approx(SAD / 2)
 
 
@@ -30,12 +31,12 @@ def test_derived_params_at_beam_start():
 
     # Evaluate at beam start: L = s_prime - s0 = 0 - SAD = -SAD
     L_beam_start = 0.0 - s0
-    x_at_beam_start, _, _ = derived_params_at_zprime(A, B, C, L_beam_start)
+    x_at_beam_start, _, _ = derived_params_at_sprime(A, B, C, L_beam_start)
     expected = np.sqrt(A * s0**2 + C)
     assert x_at_beam_start == pytest.approx(expected)
 
     # Sanity check: evaluating at L=0 gives sqrt(C), which is different
-    x_at_ref, _, _ = derived_params_at_zprime(A, B, C, 0.0)
+    x_at_ref, _, _ = derived_params_at_sprime(A, B, C, 0.0)
     assert x_at_ref == pytest.approx(np.sqrt(C))
     assert x_at_beam_start != pytest.approx(x_at_ref)
 
@@ -49,8 +50,7 @@ def _make_synthetic_df(sad=SAD, n_z=10, energies=(100.0, 200.0)):
             s = sad - z
             L = s - sad  # s0=sad (IEC z0=0)
             sigma = np.sqrt(max(0.01 * L**2 + 4.0, 0.0))
-            rows.append({"z": z, "s": s, "energy": e,
-                         "sigma_x_mm": sigma, "sigma_y_mm": sigma * 0.9})
+            rows.append({"z": z, "s": s, "energy": e, "sigma_x_mm": sigma, "sigma_y_mm": sigma * 0.9})
     return pd.DataFrame(rows)
 
 

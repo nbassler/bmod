@@ -46,6 +46,7 @@ def _second_diff_matrix(n: int) -> np.ndarray:
         D[i, i + 2] = 1.0
     return D
 
+
 # ----------------------------
 # Global quadratic-in-L model per plane
 # σ^2(z,E) = A(E) L^2 + B(E) L + C(E),  L = z - z0
@@ -68,10 +69,14 @@ class _PlaneFit:
 
 
 def _fit_plane_global(
-    df: pd.DataFrame, s0: float, plane: str,
-    *, n_bases: int = 10, degree: int = 3,
+    df: pd.DataFrame,
+    s0: float,
+    plane: str,
+    *,
+    n_bases: int = 10,
+    degree: int = 3,
     lambda_reg: tuple[float, float, float] = (1e-2, 1e-2, 1e-2),
-    weight_col: Optional[str] = None
+    weight_col: Optional[str] = None,
 ) -> _PlaneFit:
     """Fit one plane (x or y) with global B-spline in energy.
     n_bases: number of B-spline bases
@@ -89,7 +94,7 @@ def _fit_plane_global(
     L = s - float(s0)
 
     # Design matrix: [L^2*B | L*B | 1*B]   -> N x (3K)
-    X = np.concatenate([(L**2)[:, None]*B, L[:, None]*B, B], axis=1)
+    X = np.concatenate([(L**2)[:, None] * B, L[:, None] * B, B], axis=1)
     y = np.square(sig)
 
     # weights
@@ -107,18 +112,18 @@ def _fit_plane_global(
     for i, lam in enumerate(lambda_reg):
         if lam <= 0 or D2.size == 0:
             continue
-        row = np.zeros((D2.shape[0], 3*K))
-        row[:, i*K:(i+1)*K] = np.sqrt(lam) * D2
+        row = np.zeros((D2.shape[0], 3 * K))
+        row[:, i * K : (i + 1) * K] = np.sqrt(lam) * D2
         rows.append(row)
-    R = np.vstack(rows) if rows else np.zeros((0, 3*K))
+    R = np.vstack(rows) if rows else np.zeros((0, 3 * K))
 
     A_mat = np.vstack([WX, R])
     b_vec = np.concatenate([Wy, np.zeros(R.shape[0])])
 
     theta, *_ = np.linalg.lstsq(A_mat, b_vec, rcond=None)  # (3K,)
-    coef_A = theta[0*K:1*K]
-    coef_B = theta[1*K:2*K]
-    coef_C = theta[2*K:3*K]
+    coef_A = theta[0 * K : 1 * K]
+    coef_B = theta[1 * K : 2 * K]
+    coef_C = theta[2 * K : 3 * K]
     return _PlaneFit(coef_A, coef_B, coef_C, knots, degree, E_min, E_scale, K)
 
 
@@ -134,6 +139,7 @@ def _eval_coeffs(fit: _PlaneFit, energies: np.ndarray) -> tuple[np.ndarray, np.n
     C = B @ fit.coef_C
     return A, Bc, C
 
+
 # ----------------------------
 # Public API (unchanged)
 # ----------------------------
@@ -143,7 +149,9 @@ def fit_all_energies(
     df: pd.DataFrame,
     s0: float = 0.0,
     s_prime: float = 0.0,
-    *, n_bases: int = 8, degree: int = 3,
+    *,
+    n_bases: int = 8,
+    degree: int = 3,
     lambda_reg_xy: tuple[float, float, float] = (1e-2, 1e-2, 1e-2),
     weight_col: Optional[str] = None,
 ) -> pd.DataFrame:
@@ -155,14 +163,12 @@ def fit_all_energies(
     s0: reference point for fitting (in beam coordinates)
     s_prime: position where derived beam parameters are evaluated (in beam coordinates)
     """
-    req = ['s', 'sigma_x_mm', 'sigma_y_mm', 'energy']
+    req = ["s", "sigma_x_mm", "sigma_y_mm", "energy"]
     if not all(c in df.columns for c in req):
         raise ValueError(f"DataFrame must contain columns: {req}")
 
-    fit_x = _fit_plane_global(df, s0, "x", n_bases=n_bases, degree=degree,
-                              lambda_reg=lambda_reg_xy, weight_col=weight_col)
-    fit_y = _fit_plane_global(df, s0, "y", n_bases=n_bases, degree=degree,
-                              lambda_reg=lambda_reg_xy, weight_col=weight_col)
+    fit_x = _fit_plane_global(df, s0, "x", n_bases=n_bases, degree=degree, lambda_reg=lambda_reg_xy, weight_col=weight_col)
+    fit_y = _fit_plane_global(df, s0, "y", n_bases=n_bases, degree=degree, lambda_reg=lambda_reg_xy, weight_col=weight_col)
 
     energies = np.sort(df["energy"].unique().astype(float))
     Ax, Bx, Cx = _eval_coeffs(fit_x, energies)
@@ -171,19 +177,29 @@ def fit_all_energies(
     # σ^2(s,E) = A(E) L^2 + B(E) L + C(E),  L = s - s0
     # derived_params_at_zprime expects an L-offset, so convert absolute s_prime
     L_prime = s_prime - s0
-    x, xp, xxp = derived_params_at_zprime(Ax, Bx, Cx, L_prime)
-    y, yp, yyp = derived_params_at_zprime(Ay, By, Cy, L_prime)
+    x, xp, xxp = derived_params_at_sprime(Ax, Bx, Cx, L_prime)
+    y, yp, yyp = derived_params_at_sprime(Ay, By, Cy, L_prime)
 
-    out = pd.DataFrame({
-        "energy": energies,
-        "x_a": Ax, "x_b": Bx, "x_c": Cx,
-        "y_a": Ay, "y_b": By, "y_c": Cy,
-        "x_success": True,
-        "y_success": True,
-        "x": x, "y": y, "x'": xp,
-        "y'": yp, "xx'": xxp, "yy'": yyp,
-        "s": float(s_prime),
-    })
+    out = pd.DataFrame(
+        {
+            "energy": energies,
+            "x_a": Ax,
+            "x_b": Bx,
+            "x_c": Cx,
+            "y_a": Ay,
+            "y_b": By,
+            "y_c": Cy,
+            "x_success": True,
+            "y_success": True,
+            "x": x,
+            "y": y,
+            "x'": xp,
+            "y'": yp,
+            "xx'": xxp,
+            "yy'": yyp,
+            "s": float(s_prime),
+        }
+    )
     return out
 
 
@@ -194,7 +210,7 @@ def shift_reference(A, B, C, s_prime):
     return A_prime, B_prime, C_prime
 
 
-def derived_params_at_zprime(A, B, C, s_prime):
+def derived_params_at_sprime(A, B, C, s_prime):
     A_prime, B_prime, C_prime = shift_reference(A, B, C, s_prime)
     x = np.sqrt(np.clip(C_prime, 0.0, None))
     xp = np.sqrt(np.clip(A_prime, 0.0, None))
@@ -202,10 +218,7 @@ def derived_params_at_zprime(A, B, C, s_prime):
     return x, xp, xxp
 
 
-def plot_fits(
-    df: pd.DataFrame, fit_df: pd.DataFrame,
-    output_prefix: str = "fit_plot", s0: float = 0.0
-) -> None:
+def plot_fits(df: pd.DataFrame, fit_df: pd.DataFrame, output_prefix: str = "fit_plot", s0: float = 0.0) -> None:
     """Plot σ vs s and the quadratic fits per energy, showing derived x and y parameters at s'."""
     fmap = {float(r["energy"]): r for _, r in fit_df.iterrows()}
     for energy in df["energy"].unique():
@@ -225,8 +238,8 @@ def plot_fits(
 
         L = s_fit - s0_use
         # Calculate sigma from sigma² fits
-        x_fit = np.sqrt(np.clip(p["x_a"]*L**2 + p["x_b"]*L + p["x_c"], 0.0, None))
-        y_fit = np.sqrt(np.clip(p["y_a"]*L**2 + p["y_b"]*L + p["y_c"], 0.0, None))
+        x_fit = np.sqrt(np.clip(p["x_a"] * L**2 + p["x_b"] * L + p["x_c"], 0.0, None))
+        y_fit = np.sqrt(np.clip(p["y_a"] * L**2 + p["y_b"] * L + p["y_c"], 0.0, None))
 
         plt.figure(figsize=(10, 6))
         plt.scatter(s, sx, label="x data")
@@ -245,8 +258,9 @@ def plot_fits(
             f"Derived X: x={p['x']:.3f}, x'={xp:.3f}, xx'={xxp:.3f}\n"
             f"Derived Y: y={p['y']:.3f}, y'={yp:.3f}, yy'={yyp:.3f}"
         )
-        plt.text(0.02, 0.95, txt, transform=plt.gca().transAxes,
-                 va="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
+        plt.text(
+            0.02, 0.95, txt, transform=plt.gca().transAxes, va="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+        )
         plt.xlabel("s (mm)")
         plt.ylabel("σ (mm)")
         plt.title(f"Energy = {energy:.1f} MeV")
