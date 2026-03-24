@@ -150,8 +150,8 @@ def fit_all_energies(
     """
     Global smooth fit across energy for quadratic-in-L model.
     Returns per-energy coefficients and derived params.
-    Required df columns: ['z','sigma_x_mm','sigma_y_mm','energy']
-    The 'z' column is treated as the beam-direction coordinate s.
+    Required df columns: ['s','sigma_x_mm','sigma_y_mm','energy']
+    The 's' column is the beam-direction coordinate (s=0 at beam start, s=SAD at isocenter).
     s0: reference point for fitting (in beam coordinates)
     s_prime: position where derived beam parameters are evaluated (in beam coordinates)
     """
@@ -169,9 +169,10 @@ def fit_all_energies(
     Ay, By, Cy = _eval_coeffs(fit_y, energies)
 
     # σ^2(s,E) = A(E) L^2 + B(E) L + C(E),  L = s - s0
-
-    x, xp, xxp = derived_params_at_zprime(Ax, Bx, Cx, s_prime)
-    y, yp, yyp = derived_params_at_zprime(Ay, By, Cy, s_prime)
+    # derived_params_at_zprime expects an L-offset, so convert absolute s_prime
+    L_prime = s_prime - s0
+    x, xp, xxp = derived_params_at_zprime(Ax, Bx, Cx, L_prime)
+    y, yp, yyp = derived_params_at_zprime(Ay, By, Cy, L_prime)
 
     out = pd.DataFrame({
         "energy": energies,
@@ -236,12 +237,13 @@ def plot_fits(
         plt.axvline(x=s0_use, color="gray", linestyle=":", label=f"Fit ref s0 = {s0_use:.1f} mm")
         plt.axvline(x=s_prime, color="red", linestyle=":", label=f"Params ref s' = {s_prime:.1f} mm")
 
+        xp, xxp, yp, yyp = p["x'"], p["xx'"], p["y'"], p["yy'"]
         txt = (
             f"Energy = {energy:.1f} MeV\n"
             f"Fit ref s0 = {s0_use:.1f} mm\n"
             f"Params at s' = {s_prime:.1f} mm\n"
-            f"Derived X: x={p['x']:.3f}, x'={p['x\'']:.3f}, xx'={p['xx\'']:.3f}\n"
-            f"Derived Y: y={p['y']:.3f}, y'={p['y\'']:.3f}, yy'={p['yy\'']:.3f}"
+            f"Derived X: x={p['x']:.3f}, x'={xp:.3f}, xx'={xxp:.3f}\n"
+            f"Derived Y: y={p['y']:.3f}, y'={yp:.3f}, yy'={yyp:.3f}"
         )
         plt.text(0.02, 0.95, txt, transform=plt.gca().transAxes,
                  va="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))

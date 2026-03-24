@@ -172,8 +172,10 @@ def fit_all_energies(
     energies = np.sort(df["energy"].unique().astype(float))
     Ax, Bx, Cx, Dx = _eval_coeffs_at_energies(fit_x, energies)
     Ay, By, Cy, Dy = _eval_coeffs_at_energies(fit_y, energies)
-    x, xp, xxp = derived_params_at_zprime(Ax, Bx, Cx, Dx, s_prime)
-    y, yp, yyp = derived_params_at_zprime(Ay, By, Cy, Dy, s_prime)
+    # derived_params_at_zprime expects an L-offset, so convert absolute s_prime
+    L_prime = s_prime - s0
+    x, xp, xxp = derived_params_at_zprime(Ax, Bx, Cx, Dx, L_prime)
+    y, yp, yyp = derived_params_at_zprime(Ay, By, Cy, Dy, L_prime)
     out = pd.DataFrame({
         "energy": energies,
         "x_a": Ax, "x_b": Bx, "x_c": Cx, "x_d": Dx,
@@ -232,12 +234,13 @@ def plot_fits(
         plt.plot(s_fit, y_fit, "--", label="y fit")
         plt.axvline(x=s0_use, color="gray", linestyle=":", label=f"Fit ref s0 = {s0_use:.1f} mm")
         plt.axvline(x=s_prime, color="red", linestyle=":", label=f"Params ref s' = {s_prime:.1f} mm")
+        xp, xxp, yp, yyp = p["x'"], p["xx'"], p["y'"], p["yy'"]
         txt = (
             f"Energy = {energy:.1f} MeV\n"
             f"Fit ref s0 = {s0_use:.1f} mm\n"
             f"Params at s' = {s_prime:.1f} mm\n"
-            f"Derived X: x={p['x']:.3f}, x'={p['x\'']:.3f}, xx'={p['xx\'']:.3f}\n"
-            f"Derived Y: y={p['y']:.3f}, y'={p['y\'']:.3f}, yy'={p['yy\'']:.3f}"
+            f"Derived X: x={p['x']:.3f}, x'={xp:.3f}, xx'={xxp:.3f}\n"
+            f"Derived Y: y={p['y']:.3f}, y'={yp:.3f}, yy'={yyp:.3f}"
         )
         plt.text(0.02, 0.95, txt, transform=plt.gca().transAxes,
                  va="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
