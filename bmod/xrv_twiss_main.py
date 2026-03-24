@@ -98,8 +98,11 @@ def main(args=None) -> int:
     df = pd.read_csv(input_file)
     logger.info(f"Data loaded. Found {len(df['energy'].unique())} unique energy levels.")
 
-    # Compute beam-relative coordinate: s=0 at beam start (IEC z=sad), s=sad at isocenter (IEC z=0)
-    # s: beam-relative coordinate, s=0 at source, s=sad at isocenter (Fermi-Eyges convention)
+    # Compute the beam-relative coordinate s (Fermi-Eyges convention).
+    # s measures distance from the source along the beam axis:
+    #   s = 0   at the physical source / beam-entrance plane  (IEC: z = +sad)
+    #   s = sad at the isocenter                              (IEC: z = 0)
+    # The transformation is: s = sad - z  (IEC z decreases as the beam travels toward isocenter)
     df['s'] = sad - df['z']
 
     if air_file is not None:
