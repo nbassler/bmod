@@ -234,14 +234,14 @@ def plot_fits(
         plt.plot(s_fit, x_fit, "--", label="x fit")
         plt.plot(s_fit, y_fit, "--", label="y fit")
 
-        plt.axvline(x=s0_use, color="gray", linestyle=":", label=f"Fit ref s0 = {s0_use:.1f} mm")
-        plt.axvline(x=s_prime, color="red", linestyle=":", label=f"Params ref s' = {s_prime:.1f} mm")
+        plt.axvline(x=s0_use, color="gray", linestyle=":", label=f"s_ref = {s0_use:.1f} mm")
+        plt.axvline(x=s_prime, color="red", linestyle=":", label=f"s = {s_prime:.1f} mm")
 
         xp, xxp, yp, yyp = p["x'"], p["xx'"], p["y'"], p["yy'"]
         txt = (
             f"Energy = {energy:.1f} MeV\n"
-            f"Fit ref s0 = {s0_use:.1f} mm\n"
-            f"Params at s' = {s_prime:.1f} mm\n"
+            f"s_ref = {s0_use:.1f} mm\n"
+            f"Params at s = {s_prime:.1f} mm\n"
             f"Derived X: x={p['x']:.3f}, x'={xp:.3f}, xx'={xxp:.3f}\n"
             f"Derived Y: y={p['y']:.3f}, y'={yp:.3f}, yy'={yyp:.3f}"
         )
